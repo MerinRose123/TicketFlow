@@ -1,6 +1,14 @@
-# Django Ticket Management
+# TicketFlow
 
-A Django application for user accounts, role-based ticket workflows, live notifications, and background ticket updates.
+TicketFlow is a Django application for user accounts, role-based ticket workflows, live notifications, and background ticket updates. The [GitHub repository](https://github.com/MerinRose123/TicketFlow) and local checkout folder are both named `TicketFlow`.
+
+The repository root is `TicketFlow/`; the Django source project remains in `TicketProject/`. Renaming the repository and local folder did not change Python import paths, database names, or Django settings modules.
+
+## User interface
+
+The dashboard brings ticket actions and live team activity together in one view:
+
+![TicketFlow dashboard showing ticket actions and live activity panels](docs/images/ticketflow-dashboard.png)
 
 ## Technology stack
 
@@ -20,27 +28,61 @@ Exact package pins are in [`TicketProject/requirements.txt`](TicketProject/requi
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    Browser[Browser]
-    Django[Django views and ORM]
-    DB[(PostgreSQL)]
-    ASGI[ASGI routing and Channels consumer]
-    Layer[(Redis Channels layer)]
-    Broker[(Redis Celery broker)]
-    Worker[Celery worker]
-    Result[(Redis result backend)]
+### System context and component boundaries
 
-    Browser -->|HTTP request| Django
-    Django <-->|read and write| DB
-    Django -->|GET /home/ enqueues change_state| Broker
-    Broker -->|task message| Worker
-    Worker -->|cancel overdue unfinished tickets| DB
-    Worker -->|task result| Result
-    Browser <-->|WebSocket /notifications/| ASGI
-    ASGI <-->|join gossip group and broadcast| Layer
-    Django -->|model signal group_send| Layer
+```mermaid
+flowchart TB
+    Client["Browser client<br/>HTML forms + dashboard JavaScript"]
+
+    subgraph WebTier["Web tier · Django project"]
+        HttpEntry["HTTP entry<br/>Django runserver locally / WSGI config"]
+        Urls["URL resolver<br/>site routes + Django admin"]
+        SessionAuth["Session authentication<br/>role checks + CSRF on forms"]
+        Views["Views and forms<br/>HTML response / redirect"]
+        ORM["Django ORM"]
+        WsEntry["Channels ASGI WebSocket route<br/>/notifications/"]
+        Consumer["NotConsumer<br/>accepts socket; joins gossip group"]
+        WsLimit["Current gap<br/>no WebSocket auth or origin check"]
+        Signals["User and Ticket model signals<br/>post_save / post_delete"]
+    end
+
+    subgraph DataTier["Data and messaging tier"]
+        DB[("PostgreSQL<br/>users · groups · tickets · sessions")]
+        ChannelRedis[("Redis channel layer<br/>cross-process gossip messages")]
+        Broker[("Redis Celery broker<br/>task queue · REDIS_URL")]
+        Worker["Celery worker<br/>change_state task"]
+        Result[("Redis result backend<br/>task result · configured URL")]
+    end
+
+    Client -->|HTTP GET / POST| HttpEntry --> Urls --> SessionAuth --> Views
+    Views -->|render or redirect| HttpEntry
+    Views <-->|read / write| ORM
+    ORM <-->|queries and transactions| DB
+
+    Client <-->|WebSocket frames| WsEntry --> Consumer
+    Consumer <-->|group_add / group_send| ChannelRedis
+    Consumer -.-> WsLimit
+    ORM -. "model save or delete" .-> Signals
+    Signals -->|group_send: gossip| ChannelRedis
+
+    Views -->|GET /home/: apply_async change_state| Broker
+    Broker -->|queued task| Worker
+    Worker -->|select overdue tickets; bulk update state| DB
+    Worker -->|task outcome| Result
 ```
+
+This diagram describes the running code, not a production deployment. HTTP is configured through Django's WSGI application; the `/notifications/` socket is routed through the Channels ASGI application. Locally, `runserver` provides the development entry point. A production reverse proxy, TLS termination, static-file hosting, and process supervisor are deployment concerns and are not configured in this repository. PostgreSQL is the source of truth. Redis carries transient notifications and Celery messages/results; the broker, result backend, and channel layer are separate logical roles and may share a Redis server.
+
+### Component responsibilities and data ownership
+
+| Component | Responsibility | Durability / boundary |
+| --- | --- | --- |
+| Django views and forms | Registration, login/logout, role-guarded ticket/user actions, and server-rendered pages. | Handles a request synchronously; persists application state through the ORM. |
+| Django ORM and PostgreSQL | User identities, group membership, tickets, and framework session data. | Durable system of record. Ticket state is stored here. |
+| Model signals and Channels | Turn selected user/ticket saves or deletes into events sent to the `gossip` group. | Redis group delivery is transient; notifications are not the source of record. |
+| Celery broker and worker | Queue and run the overdue-ticket state update outside the dashboard response. | Broker temporarily stores task messages; the worker mutates tickets in PostgreSQL. |
+| Celery result backend | Store task return values. | Operational result data in Redis; not needed to reconstruct ticket state. |
+| Browser | Render pages and maintain a WebSocket for live updates. | Client state is temporary; there is no server-side notification history or reconnect replay. |
 
 ### HTTP request flow
 
@@ -54,6 +96,8 @@ flowchart LR
 2. A Celery worker consumes the message, queries PostgreSQL, and marks overdue tickets cancelled unless they are already done or cancelled.
 3. Celery stores the task result in the configured Redis result backend. No Celery Beat schedule is configured, so a dashboard request currently triggers the scan.
 
+The task performs a conditional bulk update: tickets whose `end_date` is before the local date are cancelled unless already done or cancelled. Re-running the update is idempotent. There is no dedicated scheduler, retry policy, dead-letter queue, or alerting configured.
+
 ### WebSocket notification flow
 
 1. The dashboard's browser code connects to `/notifications/`.
@@ -61,6 +105,14 @@ flowchart LR
 3. Django `post_save` and `post_delete` signals publish user/ticket events to that group through the Channels layer. Redis lets a message published by one Django process reach socket consumers in another process.
 
 Channels/Redis is the transient message path; PostgreSQL remains the system of record. Celery's Redis broker is a separate Redis use from Channels' message layer, even though both can use one Redis server.
+
+### System-design tradeoffs and next steps
+
+- **Request latency:** normal ticket actions use synchronous Django views and ORM calls. The dashboard queues maintenance work, but Redis availability is currently on the dashboard request path.
+- **Consistency:** model signals publish after ORM save/delete signals. Publication is not transaction-aware, so a notification failure can occur after a database write, and consumers may see an event before a surrounding transaction commits. Use `transaction.on_commit` or a transactional outbox if reliable event ordering is required.
+- **Delivery semantics:** the channel layer is for short-lived fan-out, not durable delivery. Persist events or provide a polling/API read path if clients must recover missed updates.
+- **Scaling:** Django web instances can share PostgreSQL and Redis; the Redis channel layer carries group events across web processes, and Celery workers can scale separately. No connection-pool, cache, rate-limit, or capacity settings are defined here.
+- **Operations:** production deployment should add TLS/reverse-proxy configuration, WebSocket authentication and origin checks, health checks, structured logs, worker monitoring, retries with limits, and a scheduled due-date task.
 
 ## HTTP routes and API surface
 
@@ -188,7 +240,7 @@ Run the Django test suite from `TicketProject` after activating the virtual envi
 DJANGO_TEST_SQLITE=true python manage.py test user_management --settings=TicketProject.settings.local
 ```
 
-The suite covers public pages, registration and role assignment, login and dashboard access, distinct senior-admin and super-admin ticket edit route resolution, the overdue-ticket task, and a Channels consumer receiving a group event. The task test executes the Celery task synchronously; it does not need a worker. The command uses a temporary SQLite test database and an in-memory Channels layer, so it does not need PostgreSQL, Redis, or database creation privileges. Omit `DJANGO_TEST_SQLITE=true` to run the suite against PostgreSQL; the configured database role then needs permission to create test databases.
+The suite covers public pages, registration and role assignment, login and dashboard access, GET smoke checks for every configured HTTP URL under the relevant login/role contexts, distinct senior-admin and super-admin ticket edit route resolution, the overdue-ticket task, and a Channels consumer receiving a group event. The task test executes the Celery task synchronously; it does not need a worker. The URL smoke checks exercise GET behavior and redirects; they do not submit forms that create, edit, or delete persistent records. The command uses a temporary SQLite test database and an in-memory Channels layer, so it does not need PostgreSQL, Redis, or database creation privileges. Omit `DJANGO_TEST_SQLITE=true` to run the suite against PostgreSQL; the configured database role then needs permission to create test databases.
 
 ### CI and linting
 

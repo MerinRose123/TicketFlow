@@ -30,6 +30,65 @@ class TicketEditRouteTests(TestCase):
 @override_settings(CHANNEL_LAYERS={
     'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'},
 })
+class URLSmokeTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.users = {}
+        for role in ('system_admin', 'senior_system_admin', 'super_admin'):
+            group = Group.objects.get_or_create(name=role)[0]
+            user = get_user_model().objects.create_user(
+                username='smoke_' + role,
+                password='Local-Test-Password-9382',
+            )
+            user.groups.add(group)
+            cls.users[role] = user
+
+    def test_public_and_builtin_admin_pages(self):
+        for route in ('/', '/register/', '/login/'):
+            with self.subTest(route=route):
+                self.assertEqual(self.client.get(route).status_code, 200)
+
+        self.assertEqual(self.client.get('/admin/').status_code, 302)
+
+    def test_role_protected_and_authenticated_http_routes(self):
+        cases = {
+            'system_admin': {
+                '/home/': 200,
+                '/logout/': 302,
+                '/listticket/': 200,
+                '/view_ticket_system_admin/': 200,
+                '/edituser/': 302,
+                '/deleteuser/': 302,
+                '/deleteticket/': 302,
+                '/edit_state_ticket_to_progress/': 302,
+                '/edit_state_ticket_to_done/': 302,
+            },
+            'senior_system_admin': {
+                '/addticket/': 200,
+                '/editticket/': 302,
+            },
+            'super_admin': {
+                '/listuser/': 200,
+                '/addticketadmin/': 200,
+                '/editticketadmin/': 302,
+            },
+        }
+
+        for role, route_expectations in cases.items():
+            for route, expected_status in route_expectations.items():
+                with self.subTest(role=role, route=route):
+                    self.client.force_login(self.users[role])
+                    if route == '/home/':
+                        with patch('user_management.views.change_state.apply_async'):
+                            response = self.client.get(route)
+                    else:
+                        response = self.client.get(route)
+                    self.assertEqual(response.status_code, expected_status)
+
+
+@override_settings(CHANNEL_LAYERS={
+    'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'},
+})
 class AccountAndDashboardTests(TestCase):
     @classmethod
     def setUpTestData(cls):

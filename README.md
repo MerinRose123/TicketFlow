@@ -80,13 +80,16 @@ The project currently exposes a server-rendered Django site that submits HTML fo
 | `/addticketadmin/` | GET, POST | Super admin ticket creation. |
 | `/listticket/` | GET | Signed-in ticket list. |
 | `/view_ticket_system_admin/` | GET | Signed-in user's assigned ticket view. |
-| `/editticket/` | POST | Ticket edit handler; currently the senior-admin route wins because this path is registered twice. |
+| `/editticket/` | POST | Senior system admin ticket edit and assignment handler. |
+| `/editticketadmin/` | POST | Super admin ticket edit handler. |
 | `/deleteticket/` | POST | Super admin ticket deletion. |
 | `/edit_state_ticket_to_progress/` | POST | System admin moves a ticket to in-progress. |
 | `/edit_state_ticket_to_done/` | POST | System admin marks an in-progress ticket done. |
 | `/notifications/` | WebSocket | Channels connection for live notification events (not a JSON REST route). |
 
 Forms use Django's normal session authentication and CSRF middleware. The WebSocket consumer currently accepts connections without checking authentication or origin; it sends events to every connected client in the shared `gossip` group. Add authorization and origin validation before exposing this beyond a trusted local environment.
+
+The senior-admin and super-admin edit forms post to separate named routes (`editticket` and `editticketadmin`). The super-admin endpoint is `/editticketadmin/`, so it does not shadow the senior-admin route.
 
 ### WebSocket message events
 
@@ -185,7 +188,7 @@ Run the Django test suite from `TicketProject` after activating the virtual envi
 DJANGO_TEST_SQLITE=true python manage.py test user_management --settings=TicketProject.settings.local
 ```
 
-The suite covers public pages, registration and role assignment, login and dashboard access, the overdue-ticket task, and a Channels consumer receiving a group event. The task test executes the Celery task synchronously; it does not need a worker. The command uses a temporary SQLite test database and an in-memory Channels layer, so it does not need PostgreSQL, Redis, or database creation privileges. Omit `DJANGO_TEST_SQLITE=true` to run the suite against PostgreSQL; the configured database role then needs permission to create test databases.
+The suite covers public pages, registration and role assignment, login and dashboard access, distinct senior-admin and super-admin ticket edit route resolution, the overdue-ticket task, and a Channels consumer receiving a group event. The task test executes the Celery task synchronously; it does not need a worker. The command uses a temporary SQLite test database and an in-memory Channels layer, so it does not need PostgreSQL, Redis, or database creation privileges. Omit `DJANGO_TEST_SQLITE=true` to run the suite against PostgreSQL; the configured database role then needs permission to create test databases.
 
 ### CI and linting
 

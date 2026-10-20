@@ -7,12 +7,24 @@ from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase, override_settings
-from django.urls import reverse
+from django.urls import resolve, reverse
 from django.utils import timezone
 
 from .models import Ticket
 from .tasks import change_state
+from . import views
 from TicketProject.routing import application
+
+
+class TicketEditRouteTests(TestCase):
+    def test_senior_and_super_admin_edit_routes_resolve_to_distinct_views(self):
+        senior_route = reverse('editticket')
+        super_admin_route = reverse('editticketadmin')
+
+        self.assertEqual(senior_route, '/editticket/')
+        self.assertEqual(super_admin_route, '/editticketadmin/')
+        self.assertIs(resolve(senior_route).func, views.editticket)
+        self.assertIs(resolve(super_admin_route).func, views.editticketadmin)
 
 
 @override_settings(CHANNEL_LAYERS={

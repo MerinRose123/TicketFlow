@@ -1,5 +1,4 @@
 {% extends 'home.html' %}
-{% load static %}
 {% load has_group %}
 
 {% block data %}
@@ -22,7 +21,13 @@
 		{% for data in ticketlist %}
 			<tr class="warning">
                 <td>{{data.ticket_id }}</td>
-                <form method="post"  action="{% static '../editticket/' %}" novalidate>
+                {% if request.user|has_group:"senior_system_admin" %}
+                <form method="post" action="{% url 'editticket' %}" novalidate>
+                {% elif request.user|has_group:"super_admin" %}
+                <form method="post" action="{% url 'editticketadmin' %}" novalidate>
+                {% endif %}
+
+                {% if request.user|has_group:"senior_system_admin" or request.user|has_group:"super_admin" %}
 					 {% csrf_token %}
                     {% if request.user|has_group:"senior_system_admin"%}
                         <td><input type="text" name="assigned_to" value="{{ data.assigned_to }}"></td>
@@ -36,8 +41,16 @@
                     <td><input type="text" name="state" value="{{data.state }}"></td>
                     <td><input type="submit" value="Update"></td>
                 </form>
+                {% else %}
+                    <td>{{ data.assigned_to }}</td>
+                    <td>{{ data.start_date }}</td>
+                    <td>{{ data.end_date }}</td>
+                    <td>{{ data.subject }}</td>
+                    <td>{{ data.state }}</td>
+                    <td></td>
+                {% endif %}
                 {% if request.user|has_group:"super_admin" %}
-                    <form method="post"  action="{% static '../deleteticket/' %}" novalidate>
+                    <form method="post" action="{% url 'deleteticket' %}" novalidate>
                          {% csrf_token %}
                         <input type="hidden" name="ticket_id" value="{{ data.ticket_id }}">
                         <td><input type="submit" value="Delete"></td>

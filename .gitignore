@@ -1,0 +1,24 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments and local environment configuration
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# IDE and operating system files
+.idea/
+.vscode/
+.DS_Store
+
+# Local Django/runtime data
+*.log
+db.sqlite3
+staticfiles/
+celerybeat-schedule*
+celerybeat.pid
+dump.rdb

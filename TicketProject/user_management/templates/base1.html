@@ -1,49 +1,121 @@
-<!DOCTYPE html>
+<!doctype html>
 {% load static %}
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f7fb">
+    <title>{% block title %}Ticket Management{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'user_management/css/base1.css' %}?v=2">
+</head>
+<body>
+    <div id="container">
+        <header class="header">
+            <a class="brand" href="{% url 'base' %}" aria-label="Ticket Management home">
+                <span class="brand-mark" aria-hidden="true">T</span>
+                <span class="brand-name">Ticket<span>Flow</span></span>
+            </a>
+            <nav class="navcontainer" aria-label="Main navigation">
+                {% block links %}
+                    {% if request.user.is_authenticated %}
+                        <span class="nav-greeting">Hi, {{ request.user.first_name|default:request.user.username }}</span>
+                        <a href="{% url 'home' %}">Dashboard</a>
+                        <a class="nav-cta" href="{% url 'logout_view' %}">Sign out</a>
+                    {% else %}
+                        <a href="{% url 'login_view' %}">Sign in</a>
+                        <a class="nav-cta" href="{% url 'register' %}">Create account</a>
+                    {% endif %}
+                {% endblock %}
+            </nav>
+        </header>
 
-<html>
-	<head>
-		<title>ticket management </title>
-		<link rel = "stylesheet" type= "text/css" href = "{% static 'user_management/css/base1.css' %}"/>
-		<meta name="viewport" content="width=device-width">
-	</head>
-	<body>
-		<div id="container">
-			<div class="header">
-				<div class="heading">
-					<p class="tajheading">TICKET MANAGEMENT SYSTEM</p>
-				</div>
+        <main class="container1">
+            {% if messages %}
+                <div class="message-stack" aria-live="polite">
+                    {% for message in messages %}
+                        <div class="message {{ message.tags }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
 
-				<div class="navcontainer">
-                     Hi {{ request.user}}  |
-                    {% block links %}
-                        <a href="{% static '../login/' %}">login</a>   |
-					{% endblock %}
-				</div>
-			</div>
-			<div class="container1">
-				<div class="success">
-					{% if messages %}
-						<ul class="messages">
-							{% for message in messages %}
-								<li>
-									{{ message }}
-								</li>
-							{% endfor %}
-						</ul>
-					{% endif %}
-				</div>
-				{% block content %}
-                    This is the base page.Please login to get started......
+            {% block content %}
+                <section class="landing-hero" aria-labelledby="hero-title">
+                    <div class="hero-copy">
+                        <p class="eyebrow"><span class="eyebrow-dot"></span> Support work, in sync</p>
+                        <h1 id="hero-title">Keep every request <span>moving forward.</span></h1>
+                        <p class="hero-intro">Bring tickets, ownership, and progress into one clear workspace. Give your team an easier way to manage the work that keeps everything running.</p>
+                        <div class="hero-actions">
+                            <a class="button button-primary" href="{% url 'login_view' %}">Sign in to your workspace <span aria-hidden="true">→</span></a>
+                            <a class="button button-secondary" href="{% url 'register' %}">Create an account</a>
+                        </div>
+                        <p class="hero-note"><span aria-hidden="true">✓</span> One place for requests, updates, and resolution</p>
+                    </div>
 
-				{% endblock %}
-			</div>
-			<div class="foot">
-				<footer>
-                    Copyright © 2019. All Rights Reserved
-				</footer>
-			</div>
-	    </div>
-	</body>
-</html>
+                    <div class="hero-visual" aria-label="A preview of the ticket workflow">
+                        <div class="visual-orbit orbit-one"></div>
+                        <div class="visual-orbit orbit-two"></div>
+                        <div class="workflow-card">
+                            <div class="workflow-heading">
+                                <div>
+                                    <span class="card-kicker">THE WORKFLOW</span>
+                                    <h2>From request to resolved</h2>
+                                </div>
+                                <span class="workflow-icon" aria-hidden="true">↗</span>
+                            </div>
+                            <div class="workflow-list">
+                                <div class="workflow-step">
+                                    <span class="step-number step-open">01</span>
+                                    <div><strong>Capture the request</strong><span>Keep the details together</span></div>
+                                    <span class="step-check" aria-hidden="true">✓</span>
+                                </div>
+                                <div class="workflow-connector"></div>
+                                <div class="workflow-step">
+                                    <span class="step-number step-progress">02</span>
+                                    <div><strong>Assign an owner</strong><span>Make the next action clear</span></div>
+                                    <span class="step-arrow" aria-hidden="true">→</span>
+                                </div>
+                                <div class="workflow-connector"></div>
+                                <div class="workflow-step">
+                                    <span class="step-number step-done">03</span>
+                                    <div><strong>Track it to done</strong><span>See progress at a glance</span></div>
+                                    <span class="step-check" aria-hidden="true">✓</span>
+                                </div>
+                            </div>
+                            <div class="workflow-footer"><span class="live-dot"></span> Your team, working from one view</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="value-section" aria-labelledby="value-title">
+                    <div class="section-heading">
+                        <p class="eyebrow">A clearer way to work</p>
+                        <h2 id="value-title">Less chasing. More resolving.</h2>
+                    </div>
+                    <div class="value-grid">
+                        <article class="value-card">
+                            <span class="value-icon icon-blue" aria-hidden="true">01</span>
+                            <h3>Know what needs attention</h3>
+                            <p>Keep each request and its current status easy to find.</p>
+                        </article>
+                        <article class="value-card">
+                            <span class="value-icon icon-teal" aria-hidden="true">02</span>
+                            <h3>Make ownership visible</h3>
+                            <p>Give every ticket a clear path to the right teammate.</p>
+                        </article>
+                        <article class="value-card">
+                            <span class="value-icon icon-violet" aria-hidden="true">03</span>
+                            <h3>Keep everyone informed</h3>
+                            <p>Follow updates as work moves from open to resolved.</p>
+                        </article>
+                    </div>
+                </section>
+            {% endblock %}
+        </main>
+
+        <footer class="foot">
+            <span>TicketFlow</span>
+            <span>Support work, made clearer.</span>
+        </footer>
+    </div>
+</body>
 </html>

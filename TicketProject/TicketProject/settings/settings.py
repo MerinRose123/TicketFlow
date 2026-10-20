@@ -29,6 +29,9 @@ SECRET_KEY = 'cn9$%=3h7ot3$ld*o!a1$6m816-)=6y!77e9+ru2q-4oc-tlql'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+# Keep the primary key type aligned with the existing AutoField migrations.
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
 ALLOWED_HOSTS = []
 
 

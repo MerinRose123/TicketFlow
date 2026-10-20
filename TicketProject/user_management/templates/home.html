@@ -2,114 +2,125 @@
 {% load static %}
 {% load has_group %}
 
-{% block links %}
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
-  	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-  	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
-	<script src="{% static 'channels/js/websocketbridge.js' %}" type="text/javascript"></script>
-        <a href="{% static '../home/' %}">home  |</a>
-      {% if request.user|has_group:"super_admin" %}
-         <div class="dropdown">
-            <button class="dropdown-button">Ticket operations</button>
-            <div class="dropdown-list">
-                <a href="{% static '../addticketadmin/' %}">Add Ticket</a>
-                <a href="{% static '../listticket/' %}">Delete Ticket</a>
-                <a href="{% static '../listticket/' %}">List Tickets</a>
-                 <a href="{% static '../listticket/' %}">Update a Ticket</a>
-            </div>
-         </div>
-        <div class="dropdown">
-            <button class="dropdown-button">User Operations</button>
-            <div class="dropdown-list">
-                <a href="{% static '../register/' %}">create User</a>
-                <a href="{% static '../listuser/' %}">Delete User</a>
-                <a href="{% static '../listuser/' %}">List Users</a>
-                 <a href="{% static '../listuser/' %}">Update User details</a>
-            </div>
-        </div>
-        super_admin   |
-      {% elif request.user|has_group:"senior_system_admin"%}
-        senior_system_admin    |
-        <div class="dropdown">
-            <button class="dropdown-button">Ticket operations</button>
-            <div class="dropdown-list">
-                <a href="{% static '../addticket/' %}">Add Ticket</a>
-                <a href="{% static '../listticket/' %}">List Tickets</a>
-                 <a href="{% static '../listticket/' %}">Update a Ticket</a>
-            </div>
-         </div>
-      {% elif request.user|has_group:"system_admin"%}
-        system_admin    |
-        <div class="dropdown">
-            <button class="dropdown-button">Ticket operations</button>
-            <div class="dropdown-list">
-                <a href="{% static '../view_ticket_system_admin/' %}">View Ticket</a>
-            </div>
-         </div>
-      {% else %}
-        No designation specified    |
-      {% endif %}
-    <a href="{% static '../logout/' %}">logout</a>   |
+{% block title %}Dashboard | TicketFlow{% endblock %}
 
+{% block links %}
+    <a class="nav-link nav-current" href="{% url 'home' %}" aria-current="page">Dashboard</a>
+    {% if request.user|has_group:"super_admin" or request.user|has_group:"senior_system_admin" %}
+        <details class="nav-dropdown">
+            <summary>Tickets</summary>
+            <div class="nav-dropdown-menu">
+                {% if request.user|has_group:"super_admin" %}
+                    <a href="{% url 'addticketadmin' %}">Create ticket</a>
+                {% else %}
+                    <a href="{% url 'addticket' %}">Create ticket</a>
+                {% endif %}
+                <a href="{% url 'listticket' %}">View tickets</a>
+            </div>
+        </details>
+    {% elif request.user|has_group:"system_admin" %}
+        <a class="nav-link" href="{% url 'viewticket' %}">View tickets</a>
+    {% endif %}
+    {% if request.user|has_group:"super_admin" %}
+        <details class="nav-dropdown">
+            <summary>Users</summary>
+            <div class="nav-dropdown-menu">
+                <a href="{% url 'register' %}">Create user</a>
+                <a href="{% url 'listuser' %}">Manage users</a>
+            </div>
+        </details>
+    {% endif %}
+    <span class="nav-greeting">{{ request.user.first_name|default:request.user.username }}</span>
+    <a class="nav-cta" href="{% url 'logout_view' %}">Sign out</a>
 {% endblock %}
 
 {% block content %}
-    <ul id="notifylist">
-		<li id="not">
-		</li>
-    </ul>
-    <ul id="notifyticket">
-		<li id="notticket">
-		</li>
-    </ul>
-    {% if request.user|has_group:"super_admin" or request.user|has_group:"senior_system_admin"%}
-    <ul id="reviewticket">
-		<li id="review">
-		</li>
-    </ul>
-    {% endif %}
-     <script>
-		document.addEventListener('DOMContentLoaded', function() {
-		  const webSocketBridge = new channels.WebSocketBridge();
-		  const nl = document.querySelector("#notifylist");
-		  const ticket = document.querySelector("#notifyticket");
-		  const review = document.querySelector("#reviewticket");
+    <section class="dashboard-welcome" aria-labelledby="dashboard-title">
+        <div>
+            <p class="eyebrow"><span class="eyebrow-dot"></span> Your support workspace</p>
+            <h1 id="dashboard-title">Welcome back, {{ request.user.first_name|default:request.user.username }}.</h1>
+            <p class="dashboard-intro">Keep requests moving with a clear view of tickets, ownership, and updates.</p>
+        </div>
+        <span class="role-chip">
+            {% if request.user|has_group:"super_admin" %}Super admin
+            {% elif request.user|has_group:"senior_system_admin" %}Senior system admin
+            {% elif request.user|has_group:"system_admin" %}System admin
+            {% else %}Team member{% endif %}
+        </span>
+    </section>
 
-		  webSocketBridge.connect('/notifications/');
-		  webSocketBridge.listen(function(action, stream) {
-			console.log("RESPONSE:", action);
-			if(action.event == "New User") {
-			  var el = document.getElementById("not");
-			  el.innerHTML += `New user <b>${action.username}</b> has created!`;
-			  nl.appendChild(el);
-			}
-			if(action.event == "Delete User") {
-			  var el = document.getElementById("not");
-			  el.innerHTML += `Existing user <b>${action.username}</b> has deleted account.!`;
-			  nl.appendChild(el);
-			}
-			if(action.event == "New Ticket") {
-			  var el = document.getElementById("notticket");
-              if (action.assigned_to == '{{request.user.username}}'){
-                  el.innerHTML += `New ticket <b>${action.ticket_id}</b> is assigned to you system_admin <b>${action.assigned_to}</b>!`;
-                  ticket.appendChild(el);
+    <section class="dashboard-actions" aria-label="Quick actions">
+        <a class="dashboard-action action-primary" href="{% if request.user|has_group:'super_admin' %}{% url 'addticketadmin' %}{% else %}{% url 'addticket' %}{% endif %}">
+            <span class="action-icon" aria-hidden="true">＋</span>
+            <span><strong>Create a ticket</strong><small>Capture a new request</small></span>
+            <span class="action-arrow" aria-hidden="true">→</span>
+        </a>
+        <a class="dashboard-action" href="{% url 'listticket' %}">
+            <span class="action-icon action-icon-teal" aria-hidden="true">✓</span>
+            <span><strong>View tickets</strong><small>Review work in progress</small></span>
+            <span class="action-arrow" aria-hidden="true">→</span>
+        </a>
+        {% if request.user|has_group:"super_admin" %}
+            <a class="dashboard-action" href="{% url 'listuser' %}">
+                <span class="action-icon action-icon-violet" aria-hidden="true">◎</span>
+                <span><strong>Manage users</strong><small>Keep team access current</small></span>
+                <span class="action-arrow" aria-hidden="true">→</span>
+            </a>
+        {% endif %}
+    </section>
+
+    <section class="updates-section" aria-labelledby="updates-title">
+        <div class="updates-heading">
+            <div>
+                <p class="eyebrow">Live activity</p>
+                <h2 id="updates-title">Updates for your team</h2>
+            </div>
+            <span class="connection-status"><span class="live-dot"></span> Listening for updates</span>
+        </div>
+        <div class="updates-grid">
+            <article class="update-card">
+                <div class="update-card-heading"><span class="update-icon icon-blue">U</span><div><h3>People</h3><p>Account activity</p></div></div>
+                <ul class="update-list" id="notifylist" aria-live="polite"><li class="empty-update">New user updates will appear here.</li></ul>
+            </article>
+            <article class="update-card">
+                <div class="update-card-heading"><span class="update-icon icon-teal">T</span><div><h3>Assigned tickets</h3><p>Requests assigned to you</p></div></div>
+                <ul class="update-list" id="notifyticket" aria-live="polite"><li class="empty-update">New ticket assignments will appear here.</li></ul>
+            </article>
+            {% if request.user|has_group:"super_admin" or request.user|has_group:"senior_system_admin" %}
+                <article class="update-card">
+                    <div class="update-card-heading"><span class="update-icon icon-violet">R</span><div><h3>Reviews</h3><p>Tickets ready for attention</p></div></div>
+                    <ul class="update-list" id="reviewticket" aria-live="polite"><li class="empty-update">Ticket review updates will appear here.</li></ul>
+                </article>
+            {% endif %}
+        </div>
+    </section>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'channels/js/websocketbridge.js' %}" type="text/javascript"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const bridge = new channels.WebSocketBridge();
+            const notify = (listId, message) => {
+                const list = document.getElementById(listId);
+                if (!list) return;
+                const empty = list.querySelector('.empty-update');
+                if (empty) empty.remove();
+                const item = document.createElement('li');
+                item.textContent = message;
+                list.prepend(item);
+            };
+
+            bridge.connect('/notifications/');
+            bridge.listen(function (action) {
+                if (action.event === 'New User') notify('notifylist', `New user ${action.username} joined the workspace.`);
+                if (action.event === 'Delete User') notify('notifylist', `User ${action.username} was removed.`);
+                if (action.event === 'New Ticket' && action.assigned_to === '{{ request.user.username|escapejs }}') {
+                    notify('notifyticket', `Ticket ${action.ticket_id} was assigned to you.`);
                 }
-			}
-			if(action.event == "Ticket Deleted") {
-			  var el = document.getElementById("review");
-			  el.innerHTML += `Ticket with id <b>${action.ticket_id}</b> is deleted.!`;
-			  review.appendChild(el);
-			}
-			if(action.event == "Ticket Done") {
-			  var el = document.getElementById("review");
-			  el.innerHTML += `Ticket with id <b>${action.ticket_id}</b> is moved to done state.Please review it.!`;
-			  review.appendChild(el);
-			}
-		  })
-		  document.ws = webSocketBridge; /* for debugging */
-		})
+                if (action.event === 'Ticket Deleted') notify('reviewticket', `Ticket ${action.ticket_id} was deleted.`);
+                if (action.event === 'Ticket Done') notify('reviewticket', `Ticket ${action.ticket_id} is complete and ready for review.`);
+            });
+        });
     </script>
-    {% block data %}
-        Home
-    {% endblock %}
 {% endblock %}

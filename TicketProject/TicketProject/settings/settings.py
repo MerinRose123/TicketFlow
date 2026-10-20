@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
 import os
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -19,20 +20,35 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'cn9$%=3h7ot3$ld*o!a1$6m816-)=6y!77e9+ru2q-4oc-tlql'
-# SECRET_KEY = os.environ.get('SECRET_KEY')
+def required_env(name):
+    value = os.environ.get(name)
+    if not value or value.strip().lower().startswith('replace-this'):
+        raise ImproperlyConfigured(
+            'Set {} to a real local value before starting Django.'.format(name)
+        )
+    return value
+
+
+# Never fall back to a source-controlled key, even for local development.
+SECRET_KEY = required_env('DJANGO_SECRET_KEY')
 
 # import django
 # django.setup()
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'false').strip().lower() in ('1', 'true', 'yes', 'on')
 
 # Keep the primary key type aligned with the existing AutoField migrations.
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+    if host.strip()
+]
+
+# Use this project's actual login route for Django's authentication decorators.
+LOGIN_URL = os.environ.get('DJANGO_LOGIN_URL', '/login/')
 
 
 # Application definition

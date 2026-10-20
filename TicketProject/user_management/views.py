@@ -1,5 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 from django.shortcuts import render, redirect
+from django.contrib.auth.models import Group
 from django.contrib.auth import (
     authenticate,
     login,
@@ -7,14 +8,10 @@ from django.contrib.auth import (
 )
 from django.contrib.auth.hashers import make_password
 from django.contrib import messages
-from .forms import *
+from .forms import LoginForm, RegisterForm, TicketAddForm
 from django.contrib.auth.decorators import login_required
-from .models import *
-from datetime import date
-from django.core import serializers
-from .tasks import *
-from TicketProject.celery import app
-from celery.result import AsyncResult
+from .models import Ticket, User
+from .tasks import change_state
 from django.contrib.auth.decorators import user_passes_test
 
 
@@ -71,7 +68,7 @@ def register(request):
                 q.save()
                 add_user_to_group(q, designation)
                 messages.success(request, 'user registered successfully.')
-                response = redirect('../home/')
+                response = redirect('login_view')
         else:
             messages.error(request, 'The passwords are not matching.')
             response = redirect('../register/')
@@ -360,22 +357,7 @@ def editticketadmin(request):
 
 
 def celeryview(request):
-    """
-    To check the end date.
-    :param request: The request object
-    """
-    print("starting celery")
-    tickets = Ticket.objects.all()
-    result_id = change_state.apply_async((), retry=False)
-    # result = result_id.get()
-    # #res = AsyncResult(result_id)
-    # #result = result_id.get()
-    # # result_data = AsyncResult(id=result_id, app=app)
-    # #result = result_id.result
-    # print('The result is', result)
-    # if result is True:
-    #     ticket.state = "CAN"
-    #     tickets.save()
-    #     print('The state changed to cancel.')
+    """Queue due-date maintenance without delaying the dashboard response."""
+    return change_state.apply_async((), retry=False)
 
 

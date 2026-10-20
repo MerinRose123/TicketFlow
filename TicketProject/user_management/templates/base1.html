@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f5f7fb">
     <title>{% block title %}Ticket Management{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'user_management/css/base1.css' %}?v=2">
+    <link rel="stylesheet" href="{% static 'user_management/css/base1.css' %}?v=3">
 </head>
 <body>
     <div id="container">
@@ -117,5 +117,6 @@
             <span>Support work, made clearer.</span>
         </footer>
     </div>
+    {% block scripts %}{% endblock %}
 </body>
 </html>
